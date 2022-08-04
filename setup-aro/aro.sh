@@ -202,7 +202,7 @@ function install_platform(){
        echo "Generating SSL CERTIFICATE for $BASE_DOMAIN"
        echo "yes" | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --agree-tos
     else
-      echo "Certificate Path for  $BASE_DOMAIN  already exists"
+      echo "Certificate Path for $BASE_DOMAIN  already exists"
       echo "Validating SSL for $BASE_DOMAIN "
       if openssl x509 -checkend 86400 -noout -in live/"$BASE_DOMAIN"/fullchain.pem ;
         then
@@ -242,7 +242,7 @@ function install_platform(){
     helm -n "$PLATFORM_NAMESPACE"  upgrade --install "$PLATFORM_RELEASE_NAME" astronomer-internal/astronomer --version "$PLATFORM_VERSION"  -f platform-config/config.yaml --debug
 
 
-    oc adm policy add-scc-to-user privileged system:serviceaccount:"$PLATFORM_NAMESPACE":"$PLATFORM_RELEASE_NAME"-elasticsearch
+    oc adm policy add-scc-to-user privileged system:serviceaccount:"$PLATFORM_NAMESPACE":"$PLATFORM_RELEASE_NAME-elasticsearch"
 
     oc adm policy add-scc-to-user privileged -z "$PLATFORM_RELEASE_NAME-fluentd"
 
