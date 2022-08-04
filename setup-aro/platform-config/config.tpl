@@ -1,5 +1,5 @@
 ######################################
-### Astronomer global configuration ##
+## Astronomer global configuration  ##
 ######################################
 alertmanager:
   disableClustering: true
@@ -11,9 +11,8 @@ global:
   # Name of secret containing TLS certificate
   tlsSecret: astronomer-tls
   helmRepo: "https://internal-helm.astronomer.io"
-  manualNamespaceNamesEnabled: false
   sccEnabled: true
-  nodeExporterEnabled: false
+  nodeExporterEnabled: true
   ssl:
     enabled: true
     mode: "prefer"
@@ -23,8 +22,6 @@ global:
 nginx:
   # IP address the nginx ingress should bind to
   loadBalancerIP: ~
-  #ingressAnnotations:
-  #service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
 astronomer:
   commander:
     replicas: 2
@@ -33,8 +30,6 @@ astronomer:
         value: false
   houston:
     config:
-      registry:
-      protectedCustomRegistryEnabled: true
       allowedSystemLevelDomains:
         - astronomer.io
       publicSignups: true # Users need to be invited to have access to Astronomer. Set to true otherwise
