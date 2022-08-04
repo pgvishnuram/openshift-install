@@ -1,0 +1,9 @@
+letsencrypt.*
+setup-aro/accounts/
+setup-aro/archive/
+setup-aro/csr/
+setup-aro/keys/
+setup-aro/live/
+setup-aro/platform-config/config.yaml
+setup-aro/platform-config/route53record.json
+setup-aro/renewal/
