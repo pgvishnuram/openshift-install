@@ -47,9 +47,11 @@ WORKER_NODE_SIZE="${WORKER_NODE_SIZE:-6}"
 
 export POSTGRES_SERVER_NAME=$ARO_CLUSTER_NAME-dbserver
 
+DB_USERNAME="${DB_USERNAME:-astro}"
+
 DB_PASSWORD="${DB_PASSWORD:-astro}"
 
-# Astronomer Platform ENV Vars
+# Defaults for Astronomer Platform ENV Vars
 
 export BASE_DOMAIN="${BASE_DOMAIN:-vishnu-aks-028.astro-qa.link}"
 export PLATFORM_VERSION="${PLATFORM_VERSION:-0.29.2}"
@@ -58,12 +60,12 @@ export PLATFORM_RELEASE_NAME="${PLATFORM_RELEASE_NAME:-astronomer}"
 export HOSTED_ZONE_NAME="${HOSTED_ZONE_NAME:-astro-qa.link.}"
 
 function check_resource_group_existence() {
-if [ "$(az group exists --name "$RESOURCE_GROUP_NAME")" == true ]; then
-       echo "resource group $RESOURCE_GROUP_NAME alredy exists. reusing pre-created one"
-    else
-       echo 'creating new resource group'
-       az group create --name "$RESOURCE_GROUP_NAME" --location "$LOCATION"
-fi
+    if [ "$(az group exists --name "$RESOURCE_GROUP_NAME")" == true ]; then
+           echo "resource group $RESOURCE_GROUP_NAME alredy exists. reusing pre-created one"
+        else
+           echo 'creating new resource group'
+           az group create --name "$RESOURCE_GROUP_NAME" --location "$LOCATION"
+    fi
 }
 
 function install_aro() {
@@ -158,7 +160,7 @@ function deploy_postgres() {
        echo "PSQL $POSTGRES_SERVER_NAME already exists"
     else
       echo "Creating PSQL $POSTGRES_SERVER_NAME  in progress ......."
-      az postgres flexible-server create --name "$POSTGRES_SERVER_NAME" --subnet "$SUBNET_ID" -g "$RESOURCE_GROUP_NAME" --admin-user astro --admin-password "$DB_PASSWORD" --location "$LOCATION" -y
+      az postgres flexible-server create --name "$POSTGRES_SERVER_NAME" --subnet "$SUBNET_ID" -g "$RESOURCE_GROUP_NAME" --admin-user "$DB_USERNAME" --admin-password "$DB_PASSWORD" --location "$LOCATION" -y
     fi
 
 }
@@ -200,38 +202,47 @@ function install_platform(){
        echo "Generating SSL CERTIFICATE for $BASE_DOMAIN"
        echo "yes" | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --agree-tos
     else
-      echo "CERT DIR already exists"
-      echo "checking ssl validity"
-      if openssl x509 -checkend 86400 -noout -in live/"$BASE_DOMAIN"/fullchain.pem
+      echo "Certificate Path for $BASE_DOMAIN  already exists"
+      echo "Validating SSL for $BASE_DOMAIN "
+      if openssl x509 -checkend 86400 -noout -in live/"$BASE_DOMAIN"/fullchain.pem ;
         then
-            echo "Certificate is still valid"
+            echo "$BASE_DOMAIN Certificate is still valid"
         else
             echo "yes" | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --agree-tos
         fi
     fi
 
 
-    echo "Installing  astronomer enterprise with $PLATFORM_VERSION"
+    echo "Authenticating with ARO CLUSTER $ARO_CLUSTER_NAME"
+
     CLUSTER_API_URL=$(az aro show --name "$ARO_CLUSTER_NAME" --resource-group "$RESOURCE_GROUP_NAME" --query "apiserverProfile.url" -o tsv)
     CLUSTER_ADMIN_USERNAME=$(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME"| jq -r '.kubeadminUsername')
     CLUSTER_ADMIN_PASSWORD=$(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" | jq -r '.kubeadminPassword')
     AZURE_FLEXI_POSTGRES=$(az postgres flexible-server list --query "[?name=='$POSTGRES_SERVER_NAME']" | jq -r '.[].fullyQualifiedDomainName')
 
-    oc login "$CLUSTER_API_URL" -u "$CLUSTER_ADMIN_USERNAME" -p "$CLUSTER_ADMIN_PASSWORD"
+    oc login "$CLUSTER_API_URL" -u "$CLUSTER_ADMIN_USERNAME" -p "$CLUSTER_ADMIN_PASSWORD" >/dev/null
 
-    oc new-project "$PLATFORM_NAMESPACE" || oc project "$PLATFORM_NAMESPACE"
+    echo "Creating Project $PLATFORM_NAMESPACE in $ARO_CLUSTER_NAME cluster"
+
+    oc project "$PLATFORM_NAMESPACE" || oc new-project "$PLATFORM_NAMESPACE"
+
+    echo "Creating kubernetes TLS Secret for $BASE_DOMAIN"
 
     kubectl -n "$PLATFORM_NAMESPACE" get secret astronomer-tls ||  kubectl  -n "$PLATFORM_NAMESPACE" create secret tls astronomer-tls --cert live/"$BASE_DOMAIN"/fullchain.pem --key live/"$BASE_DOMAIN"/privkey.pem
+
+    echo "Creating Bootstrap Secret  for Platform Installation"
     kubectl -n "$PLATFORM_NAMESPACE" get secret astronomer-bootstrap || kubectl -n "$PLATFORM_NAMESPACE" create secret generic astronomer-bootstrap --from-literal connection="postgres://astro:astro@$AZURE_FLEXI_POSTGRES:5432"
 
     helm repo add astronomer-internal https://internal-helm.astronomer.io/
     helm repo update >/dev/null
 
+    echo "Installing  astronomer enterprise with version $PLATFORM_VERSION"
+
     envsubst < platform-config/config.tpl > platform-config/config.yaml
     helm -n "$PLATFORM_NAMESPACE"  upgrade --install "$PLATFORM_RELEASE_NAME" astronomer-internal/astronomer --version "$PLATFORM_VERSION"  -f platform-config/config.yaml --debug
 
 
-    oc adm policy add-scc-to-user privileged system:serviceaccount:"$PLATFORM_NAMESPACE":"$PLATFORM_RELEASE_NAME"-elasticsearch
+    oc adm policy add-scc-to-user privileged system:serviceaccount:"$PLATFORM_NAMESPACE":"$PLATFORM_RELEASE_NAME-elasticsearch"
 
     oc adm policy add-scc-to-user privileged -z "$PLATFORM_RELEASE_NAME-fluentd"
 
