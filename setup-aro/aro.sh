@@ -22,7 +22,7 @@ function usage() {
 
 RESOURCE_GROUP_NAME="${RESOURCE_GROUP_NAME:-sreteam}"
 
-echo $RESOURCE_GROUP_NAME
+echo "$RESOURCE_GROUP_NAME"
 
 LOCATION="${LOCATION:-centralus}"
 
@@ -51,12 +51,12 @@ export POSTGRES_SERVER_NAME=$ARO_CLUSTER_NAME-dbserver
 DB_PASSWORD="${DB_PASSWORD:-astro}"
 
 function check_resource_group_existence() {
-if [ $(az group exists --name $RESOURCE_GROUP_NAME) == true ]; then
+if [ "$(az group exists --name "$RESOURCE_GROUP_NAME")" == true ]; then
        echo "resource group $RESOURCE_GROUP_NAME alredy exists. reusing pre-created one"
     else
        echo 'creating new resource group'
-       az group create --name $RESOURCE_GROUP_NAME --location $LOCATION
-fi    
+       az group create --name "$RESOURCE_GROUP_NAME" --location "$LOCATION"
+fi
 }
 
 function install_aro() {
@@ -72,119 +72,119 @@ echo "Register Microsoft.Storage resource provider"
 
 az provider register -n Microsoft.Storage --wait
 
-if [ $(az group exists --name $RESOURCE_GROUP_NAME) == true ]; then
+if [ "$(az group exists --name "$RESOURCE_GROUP_NAME")" == true ]; then
        echo "resource group $RESOURCE_GROUP_NAME alredy exists. reusing pre-created one"
     else
        echo 'creating new resource group'
-       az group create --name $RESOURCE_GROUP_NAME --location $LOCATION
+       az group create --name "$RESOURCE_GROUP_NAME" --location "$LOCATION"
 fi
 
-if [[ $(az network vnet list --resource-group $RESOURCE_GROUP_NAME --query "[?name=='$VNET_NAME'] | length(@)")  > 0 ]]; then 
+if [[ $(az network vnet list --resource-group "$RESOURCE_GROUP_NAME" --query "[?name=='$VNET_NAME'] | length(@)")  -gt 0 ]]; then
    echo "vnet $VNET_NAME already exists. reusing pre-created one"
-   else 
+   else
    echo "create $VNET_NAME vnet "
-   az network vnet create --resource-group $RESOURCE_GROUP_NAME --name $VNET_NAME --address-prefixes $VNET_CIDR
+   az network vnet create --resource-group "$RESOURCE_GROUP_NAME" --name "$VNET_NAME" --address-prefixes "$VNET_CIDR"
    echo "vnet $VNET_NAME creation completed"
 fi
 
 
-if [[ $(az network vnet subnet list --resource-group $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME --query "[?name=='$MASTER_SUBNET_NAME'] | length(@)")  > 0 ]]; then 
+if [[ $(az network vnet subnet list --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --query "[?name=='$MASTER_SUBNET_NAME'] | length(@)")  -gt 0 ]]; then
    echo "subnet $MASTER_SUBNET_NAME already exists. reusing pre-created one"
-   else 
+   else
    echo "creating master  subnet "
-   az network vnet subnet create --resource-group $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME --name $MASTER_SUBNET_NAME --address-prefixes $MASTER_SUBNET --service-endpoints Microsoft.ContainerRegistry
+   az network vnet subnet create --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --name "$MASTER_SUBNET_NAME" --address-prefixes $MASTER_SUBNET --service-endpoints Microsoft.ContainerRegistry
    echo "subnet $MASTER_SUBNET_NAME creation completed"
 fi
 
-if [[ $(az network vnet subnet list --resource-group $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME --query "[?name=='$WORKER_SUBNET_NAME'] | length(@)")  > 0 ]]; then 
+if [[ $(az network vnet subnet list --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --query "[?name=='$WORKER_SUBNET_NAME'] | length(@)")  -gt 0 ]]; then
    echo "subnet $WORKER_SUBNET_NAME already exists. reusing pre-created one"
-   else 
+   else
    echo "creating worker  subnet "
-   az network vnet subnet create --resource-group $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME --name $WORKER_SUBNET_NAME --address-prefixes $WORKER_SUBNET --service-endpoints Microsoft.ContainerRegistry
+   az network vnet subnet create --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --name "$WORKER_SUBNET_NAME" --address-prefixes "$WORKER_SUBNET" --service-endpoints Microsoft.ContainerRegistry
    echo "subnet $WORKER_SUBNET_NAME creation completed"
 fi
 
 
-if [[ $(az network vnet subnet list --resource-group $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME --query "[?name=='$DB_SUBNET_NAME'] | length(@)")  > 0 ]]; then 
+if [[ $(az network vnet subnet list --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --query "[?name=='$DB_SUBNET_NAME'] | length(@)")  -gt 0 ]]; then
    echo "subnet $DB_SUBNET_NAME already exists. reusing pre-created one"
-   else 
+   else
    echo "creating db subnet "
-   az network vnet subnet create --resource-group $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME --name $DB_SUBNET_NAME --address-prefixes $DB_SUBNET
+   az network vnet subnet create --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME"  --name "$DB_SUBNET_NAME" --address-prefixes "$DB_SUBNET"
    echo "subnet $DB_SUBNET_NAME creation completed"
 fi
 
 
 echo "Disable subnet private endpoint policies on the master subnet"
 
-az network vnet subnet update --name $MASTER_SUBNET_NAME --resource-group $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME --disable-private-link-service-network-policies true >/dev/null
+az network vnet subnet update --name "$MASTER_SUBNET_NAME"  --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --disable-private-link-service-network-policies true >/dev/null
 
-if [[ $(az aro list --resource-group $RESOURCE_GROUP_NAME --query "[?name=='$ARO_CLUSTER_NAME'] | length(@) ")  > 0 ]]; then 
+if [[ $(az aro list --resource-group "$RESOURCE_GROUP_NAME" --query "[?name=='$ARO_CLUSTER_NAME'] | length(@) ")  -gt 0 ]]; then
    echo "cluster $ARO_CLUSTER_NAME already exists"
    else
     echo "creating $ARO_CLUSTER_NAME aro cluster"
-    az aro create --resource-group $RESOURCE_GROUP_NAME --name $ARO_CLUSTER_NAME --vnet $VNET_NAME --master-subnet $MASTER_SUBNET_NAME --worker-subnet $WORKER_SUBNET_NAME --worker-count $WORKER_NODE_SIZE --debug
+    az aro create --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" --vnet "$VNET_NAME" --master-subnet "$MASTER_SUBNET_NAME"  --worker-subnet "$WORKER_SUBNET_NAME" --worker-count "$WORKER_NODE_SIZE" --debug
 fi
 }
 
 
 function deploy_postgres() {
 
-    if [[ $(az network vnet list --resource-group $RESOURCE_GROUP_NAME --query "[?name=='$VNET_NAME'] | length(@)")  > 0 ]]; then 
+    if [[ $(az network vnet list --resource-group "$RESOURCE_GROUP_NAME" --query "[?name=='$VNET_NAME'] | length(@)")  -gt 0 ]]; then
       echo "vnet $VNET_NAME already exists. reusing pre-created one"
-      else 
+      else
       echo "create $VNET_NAME vnet "
-      az network vnet create --resource-group $RESOURCE_GROUP_NAME --name $VNET_NAME --address-prefixes $VNET_CIDR
+      az network vnet create --resource-group "$RESOURCE_GROUP_NAME" --name "$VNET_NAME"  --address-prefixes $VNET_CIDR
       echo "vnet $VNET_NAME creation completed"
     fi
 
-    if [[ $(az network vnet subnet list --resource-group $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME --query "[?name=='$DB_SUBNET_NAME'] | length(@)")  > 0 ]]; then 
+    if [[ $(az network vnet subnet list --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME"  --query "[?name=='$DB_SUBNET_NAME'] | length(@)")  -gt 0 ]]; then
       echo "subnet $DB_SUBNET_NAME already exists. reusing pre-created one"
-      else 
+      else
       echo "creating db subnet "
-      az network vnet subnet create --resource-group $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME --name $DB_SUBNET_NAME --address-prefixes $DB_SUBNET
+      az network vnet subnet create --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --name "$DB_SUBNET_NAME" --address-prefixes "$DB_SUBNET"
       echo "subnet $DB_SUBNET_NAME creation completed"
     fi
-    
-    SUBNET_ID=$(az network vnet subnet show  --resource-group  $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME --name $DB_SUBNET_NAME | jq -r '.id')
 
-    if [[ $(az postgres flexible-server list --query "[?name=='$POSTGRES_SERVER_NAME'] | length(@) ")  > 0 ]]; then 
+    SUBNET_ID=$(az network vnet subnet show  --resource-group  "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME"  --name "$DB_SUBNET_NAME" | jq -r '.id')
+
+    if [[ $(az postgres flexible-server list --query "[?name=='$POSTGRES_SERVER_NAME'] | length(@) ")  -gt 0 ]]; then
        echo "PSQL $POSTGRES_SERVER_NAME already exists"
     else
       echo "Creating PSQL $POSTGRES_SERVER_NAME  in progress......."
-      az postgres flexible-server create --name $POSTGRES_SERVER_NAME --subnet $SUBNET_ID -g $RESOURCE_GROUP_NAME --admin-user astro --admin-password $DB_PASSWORD --location $LOCATION -y
+      az postgres flexible-server create --name "$POSTGRES_SERVER_NAME" --subnet "$SUBNET_ID" -g "$RESOURCE_GROUP_NAME"--admin-user astro --admin-password "$DB_PASSWORD" --location "$LOCATION" -y
     fi
 
 }
 
 function obtain_aro_info() {
-    echo "CLUSTER_CONSOLE_URL: $(az aro show --name $ARO_CLUSTER_NAME --resource-group $RESOURCE_GROUP_NAME --query "consoleProfile.url" -o tsv)"
+    echo "CLUSTER_CONSOLE_URL: $(az aro show --name "$ARO_CLUSTER_NAME" --resource-group "$RESOURCE_GROUP_NAME" --query "consoleProfile.url" -o tsv)"
 
-    echo "CLUSTER_ADMIN_USERNAME: $(az aro list-credentials --resource-group $RESOURCE_GROUP_NAME --name $ARO_CLUSTER_NAME | jq -r '.kubeadminUsername')"
+    echo "CLUSTER_ADMIN_USERNAME: $(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME"| jq -r '.kubeadminUsername')"
 
-    echo "CLUSTER_ADMIN_PASSWORD: $(az aro list-credentials --resource-group $RESOURCE_GROUP_NAME --name $ARO_CLUSTER_NAME | jq -r '.kubeadminPassword')"
+    echo "CLUSTER_ADMIN_PASSWORD: $(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" | jq -r '.kubeadminPassword')"
 }
 
 
 
 function delete_aro() {
     set -x
-    az aro delete --resource-group ${RESOURCE_GROUP_NAME} --name ${ARO_CLUSTER_NAME} -y
+    az aro delete --resource-group "${RESOURCE_GROUP_NAME}" --name "${ARO_CLUSTER_NAME}" -y
 }
 
 
 function delete_all() {
-  az postgres flexible-server delete --resource-group $RESOURCE_GROUP_NAME --name $POSTGRES_SERVER_NAME --yes
-  az aro delete --resource-group $RESOURCE_GROUP_NAME --name $ARO_CLUSTER_NAME --yes
-  az network vnet subnet delete --name $DB_SUBNET_NAME --resource-group $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME
-  az network vnet subnet delete --name $WORKER_SUBNET_NAME --resource-group $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME
-  az network vnet subnet delete --name $MASTER_SUBNET_NAME --resource-group $RESOURCE_GROUP_NAME --vnet-name $VNET_NAME
-  az network vnet delete --resource-group $RESOURCE_GROUP_NAME --name $VNET_NAME
+  az postgres flexible-server delete --resource-group "$RESOURCE_GROUP_NAME" --name "$POSTGRES_SERVER_NAME" --yes
+  az aro delete --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" --yes
+  az network vnet subnet delete --name "$DB_SUBNET_NAME" --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME"
+  az network vnet subnet delete --name "$WORKER_SUBNET_NAME" --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME"
+  az network vnet subnet delete --name "$MASTER_SUBNET_NAME" --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME"
+  az network vnet delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VNET_NAME"
 }
 
 
 
 function delete_postgres(){
-    az postgres flexible-server delete --resource-group $RESOURCE_GROUP_NAME --name $POSTGRES_SERVER_NAME --yes
+    az postgres flexible-server delete --resource-group "$RESOURCE_GROUP_NAME" --name "$POSTGRES_SERVER_NAME" --yes
 }
 
 ## MAIN
@@ -206,7 +206,7 @@ case "$1" in
 
     obtain_aro_info)
         echo "Obtaining Info..."
-        echo 
+        echo
         obtain_aro_info
         echo
         echo "Completed successfully!"
