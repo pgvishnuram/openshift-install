@@ -202,11 +202,11 @@ function install_platform(){
        echo "Generating SSL CERTIFICATE for $BASE_DOMAIN"
        echo "yes" | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --agree-tos
     else
-      echo "CERT DIR already exists"
-      echo "checking ssl validity"
-      if openssl x509 -checkend 86400 -noout -in live/"$BASE_DOMAIN"/fullchain.pem
+      echo "Certificate Path for  $BASE_DOMAIN  already exists"
+      echo "Validating SSL for $BASE_DOMAIN "
+      if openssl x509 -checkend 86400 -noout -in live/"$BASE_DOMAIN"/fullchain.pem ;
         then
-            echo "Certificate is still valid"
+            echo "$BASE_DOMAIN Certificate is still valid"
         else
             echo "yes" | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --agree-tos
         fi
@@ -226,7 +226,7 @@ function install_platform(){
 
     oc project "$PLATFORM_NAMESPACE" || oc new-project "$PLATFORM_NAMESPACE"
 
-    echo "Creating TLS Secret for $BASE_DOMAIN"
+    echo "Creating kubernetes TLS Secret for $BASE_DOMAIN"
 
     kubectl -n "$PLATFORM_NAMESPACE" get secret astronomer-tls ||  kubectl  -n "$PLATFORM_NAMESPACE" create secret tls astronomer-tls --cert live/"$BASE_DOMAIN"/fullchain.pem --key live/"$BASE_DOMAIN"/privkey.pem
 
