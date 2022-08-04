@@ -11,19 +11,17 @@ function usage() {
     echo " $0 install_cluster"
     echo
     echo "COMMANDS:"
-    echo "   install_aro              Install AzureRedhat Openshift Cluster        "
     echo "   deploy_postgres          Deploy azureflexible postgres cluster        "
-    echo "   delete_postgres          Delete azureflexible postgres cluster        "
+    echo "   install_aro              Install AzureRedhat Openshift Cluster        "
+    echo "   install_platform         Install Astronomer Platform                  "
     echo "   obtain_aro_info          Obtain information about the ARO4 Cluster    "
+    echo "   delete_postgres          Delete azureflexible postgres cluster        "
     echo "   delete_aro               Delete ARO cluster                           "
     echo "   delete_all               Cleanup all azure resources                  "
-    echo "   install_platform                                                      "
     echo
 }
 
 RESOURCE_GROUP_NAME="${RESOURCE_GROUP_NAME:-sreteam}"
-
-echo "$RESOURCE_GROUP_NAME"
 
 LOCATION="${LOCATION:-centralus}"
 
