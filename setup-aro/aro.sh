@@ -54,6 +54,7 @@ DB_PASSWORD="${DB_PASSWORD:-astro}"
 export BASE_DOMAIN="${BASE_DOMAIN:-vishnu-aks-028.astro-qa.link}"
 export PLATFORM_VERSION="${PLATFORM_VERSION:-0.29.2}"
 export PLATFORM_NAMESPACE="${PLATFORM_NAMESPACE:-astronomer}"
+export PLATFORM_RELEASE_NAME="${PLATFORM_RELEASE_NAME:-astronomer}"
 export HOSTED_ZONE_NAME="${HOSTED_ZONE_NAME:-astro-qa.link.}"
 
 function check_resource_group_existence() {
@@ -67,24 +68,24 @@ fi
 
 function install_aro() {
     echo "Register Microsoft.RedHatOpenShift resource provider"
-    
+
     az provider register -n Microsoft.RedHatOpenShift --wait
-    
+
     echo "Register Microsoft.Compute resource provider"
-    
+
     az provider register -n Microsoft.Compute --wait
-    
+
     echo "Register Microsoft.Storage resource provider"
-    
+
     az provider register -n Microsoft.Storage --wait
-    
+
     if [ "$(az group exists --name "$RESOURCE_GROUP_NAME")" == true ]; then
            echo "resource group $RESOURCE_GROUP_NAME alredy exists. reusing pre-created one"
         else
            echo 'creating new resource group'
            az group create --name "$RESOURCE_GROUP_NAME" --location "$LOCATION"
     fi
-    
+
     if [[ $(az network vnet list --resource-group "$RESOURCE_GROUP_NAME" --query "[?name=='$VNET_NAME'] | length(@)")  -gt 0 ]]; then
        echo "vnet $VNET_NAME already exists. reusing pre-created one"
        else
@@ -92,8 +93,8 @@ function install_aro() {
        az network vnet create --resource-group "$RESOURCE_GROUP_NAME" --name "$VNET_NAME" --address-prefixes "$VNET_CIDR"
        echo "vnet $VNET_NAME creation completed"
     fi
-    
-    
+
+
     if [[ $(az network vnet subnet list --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --query "[?name=='$MASTER_SUBNET_NAME'] | length(@)")  -gt 0 ]]; then
        echo "subnet $MASTER_SUBNET_NAME already exists. reusing pre-created one"
        else
@@ -101,7 +102,7 @@ function install_aro() {
        az network vnet subnet create --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --name "$MASTER_SUBNET_NAME" --address-prefixes $MASTER_SUBNET --service-endpoints Microsoft.ContainerRegistry
        echo "subnet $MASTER_SUBNET_NAME creation completed"
     fi
-    
+
     if [[ $(az network vnet subnet list --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --query "[?name=='$WORKER_SUBNET_NAME'] | length(@)")  -gt 0 ]]; then
        echo "subnet $WORKER_SUBNET_NAME already exists. reusing pre-created one"
        else
@@ -109,8 +110,8 @@ function install_aro() {
        az network vnet subnet create --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --name "$WORKER_SUBNET_NAME" --address-prefixes "$WORKER_SUBNET" --service-endpoints Microsoft.ContainerRegistry
        echo "subnet $WORKER_SUBNET_NAME creation completed"
     fi
-    
-    
+
+
     if [[ $(az network vnet subnet list --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --query "[?name=='$DB_SUBNET_NAME'] | length(@)")  -gt 0 ]]; then
        echo "subnet $DB_SUBNET_NAME already exists. reusing pre-created one"
        else
@@ -121,9 +122,9 @@ function install_aro() {
 
 
     echo "Disable subnet private endpoint policies on the master subnet"
-    
+
     az network vnet subnet update --name "$MASTER_SUBNET_NAME"  --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --disable-private-link-service-network-policies true >/dev/null
-    
+
     if [[ $(az aro list --resource-group "$RESOURCE_GROUP_NAME" --query "[?name=='$ARO_CLUSTER_NAME'] | length(@) ")  -gt 0 ]]; then
        echo "cluster $ARO_CLUSTER_NAME already exists"
        else
@@ -215,22 +216,35 @@ function install_platform(){
     CLUSTER_ADMIN_USERNAME=$(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME"| jq -r '.kubeadminUsername')
     CLUSTER_ADMIN_PASSWORD=$(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" | jq -r '.kubeadminPassword')
     AZURE_FLEXI_POSTGRES=$(az postgres flexible-server list --query "[?name=='$POSTGRES_SERVER_NAME']" | jq -r '.[].fullyQualifiedDomainName')
-    
+
     oc login "$CLUSTER_API_URL" -u "$CLUSTER_ADMIN_USERNAME" -p "$CLUSTER_ADMIN_PASSWORD"
-    
+
     oc new-project "$PLATFORM_NAMESPACE" || oc project "$PLATFORM_NAMESPACE"
-    
+
     kubectl -n "$PLATFORM_NAMESPACE" get secret astronomer-tls ||  kubectl  -n "$PLATFORM_NAMESPACE" create secret tls astronomer-tls --cert live/"$BASE_DOMAIN"/fullchain.pem --key live/"$BASE_DOMAIN"/privkey.pem
     kubectl -n "$PLATFORM_NAMESPACE" get secret astronomer-bootstrap || kubectl -n "$PLATFORM_NAMESPACE" create secret generic astronomer-bootstrap --from-literal connection="postgres://astro:astro@$AZURE_FLEXI_POSTGRES:5432"
-    
+
     helm repo add astronomer-internal https://internal-helm.astronomer.io/
     helm repo update >/dev/null
-    
+
     envsubst < platform-config/config.tpl > platform-config/config.yaml
-    helm -n "$PLATFORM_NAMESPACE"  upgrade --install astronomer astronomer-internal/astronomer --version "$PLATFORM_VERSION"  -f platform-config/config.yaml --debug
-    
-    # Get LB IP 
-    export LB_IP=$(kubectl get svc  astronomer-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    helm -n "$PLATFORM_NAMESPACE"  upgrade --install "$PLATFORM_RELEASE_NAME" astronomer-internal/astronomer --version "$PLATFORM_VERSION"  -f platform-config/config.yaml --debug
+
+
+    oc adm policy add-scc-to-user privileged system:serviceaccount:"$PLATFORM_NAMESPACE":"$PLATFORM_RELEASE_NAME"-elasticsearch
+
+    oc adm policy add-scc-to-user privileged -z "$PLATFORM_RELEASE_NAME-fluentd"
+
+    oc patch ds "$PLATFORM_RELEASE_NAME-fluentd" -p "spec:
+      template:
+        spec:
+          containers:
+          - name: fluentd
+            securityContext:
+              privileged: true"
+
+    # Get LB IP
+    export LB_IP=$(kubectl get svc  "$PLATFORM_RELEASE_NAME-nginx" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
     # Updates route53 Records
     envsubst < platform-config/route53record.tpl > platform-config/route53record.json
     HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name  --dns-name "$HOSTED_ZONE_NAME"  | jq -r '.HostedZones[0].Id' | cut -d'/' -f3)

@@ -1,6 +1,4 @@
-
 # Openshift ARO Installer
-
 
 ```shell
 Usage:
@@ -8,13 +6,13 @@ Usage:
  ./aro.sh --help
 
 COMMANDS:
-   deploy_postgres          Deploy azureflexible postgres cluster        
-   install_aro              Install AzureRedhat Openshift Cluster        
-   install_platform         Install Astronomer Platform                  
-   obtain_aro_info          Obtain information about the ARO4 Cluster    
-   delete_postgres          Delete azureflexible postgres cluster        
-   delete_aro               Delete ARO cluster                           
-   delete_all               Cleanup all azure resources                                      
+   deploy_postgres          Deploy azureflexible postgres cluster
+   install_aro              Install AzureRedhat Openshift Cluster
+   install_platform         Install Astronomer Platform
+   obtain_aro_info          Obtain information about the ARO4 Cluster
+   delete_postgres          Delete azureflexible postgres cluster
+   delete_aro               Delete ARO cluster
+   delete_all               Cleanup all azure resources
 
 ```
 
@@ -38,6 +36,7 @@ export PLATFORM_VERSION=""
 ```
 
 ## Install Steps
+
 ```
 $ ./aro.sh deploy_postgres
 $ ./aro.sh install_aro
@@ -45,6 +44,7 @@ $ ./aro.sh install_platform
 ```
 
 ## Cleanup Steps
+
 ```
 $ helm uninstall astronomer --debug
 $ ./aro.sh delete_all
