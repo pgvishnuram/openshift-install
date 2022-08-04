@@ -18,7 +18,17 @@ COMMANDS:
 
 ```
 
-## Pre-requisties 
+## Requirements
+
+```
+- jq
+- openssl
+- awscli
+- oc ( openshift cli)
+- kubectl
+
+```
+
 ```
 # Define these env vars before executing the script
 export RESOURCE_GROUP_NAME=""
@@ -34,7 +44,7 @@ $ ./aro.sh install_aro
 $ ./aro.sh install_platform
 ```
 
-## Cleanup Stels
+## Cleanup Steps
 ```
 $ helm uninstall astronomer --debug
 $ ./aro.sh delete_all
