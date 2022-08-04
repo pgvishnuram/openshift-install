@@ -1,7 +1,7 @@
 {
             "Comment": "CREATE/DELETE/UPSERT CNAME  record for ${BASE_DOMAIN} ",
             "Changes": [{
-            "Action": "CREATE",
+            "Action": "UPSERT",
             "ResourceRecordSet": {
                "Name": "*.${BASE_DOMAIN}",
                "Type": "A",
