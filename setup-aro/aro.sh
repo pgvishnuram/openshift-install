@@ -21,6 +21,7 @@ function usage() {
     echo
 }
 
+export HOSTED_ZONE_NAME="${HOSTED_ZONE_NAME}:-"
 RESOURCE_GROUP_NAME="${RESOURCE_GROUP_NAME:-sreteam}"
 
 echo "$RESOURCE_GROUP_NAME"
@@ -229,6 +230,12 @@ helm repo update
 
 envsubst < platform-config/config.tpl > platform-config/config.yaml
 helm -n $PLATFORM_NAMESPACE  upgrade --install astronomer astronomer-internal/astronomer --version $PLATFORM_VERSION  -f platform-config/config.yaml --debug
+
+# Updates route53 Records
+envsubst < route53record.tpl > route53record.json
+HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name  --dns-name "$HOSTED_ZONE_NAME"  | jq -r '.HostedZones[0].Id' | cut -d'/' -f3)
+aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID"  --change-batch file://route53record.json
+
 
 }
 

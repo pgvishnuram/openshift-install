@@ -5,7 +5,7 @@ alertmanager:
   disableClustering: true
 global:
   # Base domain for all subdomains exposed through ingresscd
-  baseDomain: vishnu-aks-028.astro-qa.link
+  baseDomain: ${BASE_DOMAIN}
   postgresqlEnabled: false
   #clusterRoles: true
   # Name of secret containing TLS certificate
@@ -69,6 +69,7 @@ astronomer:
         openidConnect:
           google:
             enabled: true # Lets users authenticate with Google
+
 prometheus:
   # Configure resources
   resources:
