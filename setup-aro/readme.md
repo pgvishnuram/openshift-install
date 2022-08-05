@@ -13,7 +13,7 @@ COMMANDS:
    delete_postgres          Delete azureflexible postgres cluster
    delete_aro               Delete ARO cluster
    delete_all               Cleanup all azure resources
-
+   deploy_all               Deploy all infrastructure
 ```
 
 ## Requirements
