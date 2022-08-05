@@ -13,7 +13,7 @@ COMMANDS:
    delete_postgres          Delete azureflexible postgres cluster
    delete_aro               Delete ARO cluster
    delete_all               Cleanup all azure resources
-
+   deploy_all               Deploy all infrastructure
 ```
 
 ## Requirements
@@ -41,6 +41,12 @@ export PLATFORM_VERSION=""
 $ ./aro.sh deploy_postgres
 $ ./aro.sh install_aro
 $ ./aro.sh install_platform
+```
+
+## For single step provisioning
+
+```
+$ ./aro.sh  deploy_all
 ```
 
 ## Cleanup Steps

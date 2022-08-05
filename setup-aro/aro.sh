@@ -18,6 +18,7 @@ function usage() {
     echo "   delete_postgres          Delete azureflexible postgres cluster        "
     echo "   delete_aro               Delete ARO cluster                           "
     echo "   delete_all               Cleanup all azure resources                  "
+    echo "   deploy_all               Deploy all infrastructure                    "
     echo
 }
 
@@ -200,7 +201,7 @@ function delete_postgres(){
 function install_platform(){
     if [[ ! -d live/$BASE_DOMAIN ]]; then
        echo "Generating SSL CERTIFICATE for $BASE_DOMAIN"
-       echo "yes" | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --agree-tos
+       yes | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --agree-tos
     else
       echo "Certificate Path for $BASE_DOMAIN  already exists"
       echo "Validating SSL for $BASE_DOMAIN "
@@ -208,7 +209,7 @@ function install_platform(){
         then
             echo "$BASE_DOMAIN Certificate is still valid"
         else
-            echo "yes" | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --agree-tos
+            yes | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --agree-tos
         fi
     fi
 
@@ -220,7 +221,7 @@ function install_platform(){
     CLUSTER_ADMIN_PASSWORD=$(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" | jq -r '.kubeadminPassword')
     AZURE_FLEXI_POSTGRES=$(az postgres flexible-server list --query "[?name=='$POSTGRES_SERVER_NAME']" | jq -r '.[].fullyQualifiedDomainName')
 
-    oc login "$CLUSTER_API_URL" -u "$CLUSTER_ADMIN_USERNAME" -p "$CLUSTER_ADMIN_PASSWORD" >/dev/null
+    yes | oc login "$CLUSTER_API_URL" -u "$CLUSTER_ADMIN_USERNAME" -p "$CLUSTER_ADMIN_PASSWORD" --insecure-skip-tls-verify >/dev/null
 
     echo "Creating Project $PLATFORM_NAMESPACE in $ARO_CLUSTER_NAME cluster"
 
@@ -307,6 +308,16 @@ case "$1" in
         echo "Setup Astronomer Platform"
         install_platform
         echo
+        ;;
+
+    deploy_all)
+        echo "Deploy All resources"
+        check_resource_group_existence
+        deploy_postgres
+        install_aro
+        install_platform
+        echo
+        echo "Deployed successfully!"
         ;;
 
     delete_all)
