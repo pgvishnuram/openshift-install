@@ -43,6 +43,12 @@ $ ./aro.sh install_aro
 $ ./aro.sh install_platform
 ```
 
+## For single step provisioning
+
+```
+$ ./aro.sh  deploy_all
+```
+
 ## Cleanup Steps
 
 ```
