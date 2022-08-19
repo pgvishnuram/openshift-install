@@ -238,6 +238,7 @@ function install_platform(){
       export WORKER_NAMES=$WORKER_NAMES
       envsubst < platform-config/machineautoscaler.tpl > platform-config/autoscaler/"$WORKER_NAMES".yaml
     done
+    oc apply -f platform-config/autoscaler/
 
     echo "Creating kubernetes TLS Secret for $BASE_DOMAIN"
 
