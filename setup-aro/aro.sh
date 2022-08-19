@@ -131,10 +131,11 @@ function install_aro() {
     az network vnet subnet update --name "$MASTER_SUBNET_NAME"  --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --disable-private-link-service-network-policies true >/dev/null
 
     if [[ $(az aro list --resource-group "$RESOURCE_GROUP_NAME" --query "[?name=='$ARO_CLUSTER_NAME'] | length(@) ")  -gt 0 ]]; then
-       echo "cluster $ARO_CLUSTER_NAME already exists"
+        echo "cluster $ARO_CLUSTER_NAME already exists"
        else
         echo "creating $ARO_CLUSTER_NAME aro cluster"
         az aro create --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" --vnet "$VNET_NAME" --master-subnet "$MASTER_SUBNET_NAME"  --worker-subnet "$WORKER_SUBNET_NAME" --worker-count "$WORKER_NODE_SIZE" --debug
+
     fi
 }
 
@@ -225,7 +226,10 @@ function install_platform(){
     AZURE_FLEXI_POSTGRES=$(az postgres flexible-server list --query "[?name=='$POSTGRES_SERVER_NAME']" | jq -r '.[].fullyQualifiedDomainName')
 
     yes | oc login "$CLUSTER_API_URL" -u "$CLUSTER_ADMIN_USERNAME" -p "$CLUSTER_ADMIN_PASSWORD" --insecure-skip-tls-verify >/dev/null
-
+    if [[ $? != 0 ]]; then
+      echo "Cluster $ARO_CLUSTER_NAME Login Failed exiting ..."
+      exit 0
+    fi
     echo "Creating Project $PLATFORM_NAMESPACE in $ARO_CLUSTER_NAME cluster"
 
     oc project "$PLATFORM_NAMESPACE" || oc new-project "$PLATFORM_NAMESPACE"
