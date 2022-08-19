@@ -46,6 +46,8 @@ export DB_SUBNET_NAME=$ARO_CLUSTER_NAME-db
 
 WORKER_NODE_SIZE="${WORKER_NODE_SIZE:-6}"
 
+export WORKER_AUTOSCALE_COUNT="${WORKER_AUTOSCALE_COUNT:-12}"
+
 export POSTGRES_SERVER_NAME=$ARO_CLUSTER_NAME-dbserver
 
 DB_USERNAME="${DB_USERNAME:-astro}"
@@ -227,6 +229,15 @@ function install_platform(){
     echo "Creating Project $PLATFORM_NAMESPACE in $ARO_CLUSTER_NAME cluster"
 
     oc project "$PLATFORM_NAMESPACE" || oc new-project "$PLATFORM_NAMESPACE"
+
+    echo "Applying AUTOSCALER Config for $ARO_CLUSTER_NAME"
+    [ -d  platform-config/autoscaler ] || mkdir platform-config/autoscaler
+    WORKER_MACHINESET_NAMES=$(oc get MachineSet  --no-headers  -n openshift-machine-api | awk '{print $1}')
+    envsubst < platform-config/cluster-autoscaler.tpl > platform-config/autoscaler/cluster-autoscaler.yaml
+    for WORKER_NAMES in $WORKER_MACHINESET_NAMES; do
+      export WORKER_NAMES=$WORKER_NAMES
+      envsubst < platform-config/machineautoscaler.tpl > platform-config/autoscaler/"$WORKER_NAMES".yaml
+    done
 
     echo "Creating kubernetes TLS Secret for $BASE_DOMAIN"
 
