@@ -26,9 +26,9 @@ RESOURCE_GROUP_NAME="${RESOURCE_GROUP_NAME:-sreteam}"
 
 LOCATION="${LOCATION:-centralus}"
 
-ARO_CLUSTER_NAME="${ARO_CLUSTER_NAME:-srearo}"
+export ARO_CLUSTER_NAME="${ARO_CLUSTER_NAME:-srearo}"
 
-export VNET_NAME=$RESOURCE_GROUP_NAME-vnet
+export VNET_NAME=$ARO_CLUSTER_NAME-vnet
 
 export VNET_CIDR="10.0.0.0/8"
 
@@ -38,11 +38,11 @@ export WORKER_SUBNET="10.0.2.0/23"
 
 export DB_SUBNET="10.0.4.0/23"
 
-export MASTER_SUBNET_NAME=$RESOURCE_GROUP_NAME-master
+export MASTER_SUBNET_NAME=$ARO_CLUSTER_NAME-master
 
-export WORKER_SUBNET_NAME=$RESOURCE_GROUP_NAME-worker
+export WORKER_SUBNET_NAME=$ARO_CLUSTER_NAME-worker
 
-export DB_SUBNET_NAME=$RESOURCE_GROUP_NAME-db
+export DB_SUBNET_NAME=$ARO_CLUSTER_NAME-db
 
 WORKER_NODE_SIZE="${WORKER_NODE_SIZE:-6}"
 
@@ -92,7 +92,7 @@ function install_aro() {
     if [[ $(az network vnet list --resource-group "$RESOURCE_GROUP_NAME" --query "[?name=='$VNET_NAME'] | length(@)")  -gt 0 ]]; then
        echo "vnet $VNET_NAME already exists. reusing pre-created one"
        else
-       echo "create $VNET_NAME vnet "
+       echo "creating $VNET_NAME vnet "
        az network vnet create --resource-group "$RESOURCE_GROUP_NAME" --name "$VNET_NAME" --address-prefixes "$VNET_CIDR"
        echo "vnet $VNET_NAME creation completed"
     fi
@@ -162,6 +162,7 @@ function deploy_postgres() {
     else
       echo "Creating PSQL $POSTGRES_SERVER_NAME  in progress ......."
       az postgres flexible-server create --name "$POSTGRES_SERVER_NAME" --subnet "$SUBNET_ID" -g "$RESOURCE_GROUP_NAME" --admin-user "$DB_USERNAME" --admin-password "$DB_PASSWORD" --location "$LOCATION" -y
+      az postgres flexible-server parameter set --resource-group "$RESOURCE_GROUP_NAME" --server-name "$POSTGRES_SERVER_NAME"  --name azure.extensions  --value pg_trgm
     fi
 
 }
