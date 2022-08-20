@@ -46,6 +46,8 @@ export DB_SUBNET_NAME=$ARO_CLUSTER_NAME-db
 
 WORKER_NODE_SIZE="${WORKER_NODE_SIZE:-6}"
 
+export WORKER_AUTOSCALE_COUNT="${WORKER_AUTOSCALE_COUNT:-12}"
+
 export POSTGRES_SERVER_NAME=$ARO_CLUSTER_NAME-dbserver
 
 DB_USERNAME="${DB_USERNAME:-astro}"
@@ -129,10 +131,11 @@ function install_aro() {
     az network vnet subnet update --name "$MASTER_SUBNET_NAME"  --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --disable-private-link-service-network-policies true >/dev/null
 
     if [[ $(az aro list --resource-group "$RESOURCE_GROUP_NAME" --query "[?name=='$ARO_CLUSTER_NAME'] | length(@) ")  -gt 0 ]]; then
-       echo "cluster $ARO_CLUSTER_NAME already exists"
+        echo "cluster $ARO_CLUSTER_NAME already exists"
        else
         echo "creating $ARO_CLUSTER_NAME aro cluster"
         az aro create --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" --vnet "$VNET_NAME" --master-subnet "$MASTER_SUBNET_NAME"  --worker-subnet "$WORKER_SUBNET_NAME" --worker-count "$WORKER_NODE_SIZE" --debug
+
     fi
 }
 
@@ -223,10 +226,23 @@ function install_platform(){
     AZURE_FLEXI_POSTGRES=$(az postgres flexible-server list --query "[?name=='$POSTGRES_SERVER_NAME']" | jq -r '.[].fullyQualifiedDomainName')
 
     yes | oc login "$CLUSTER_API_URL" -u "$CLUSTER_ADMIN_USERNAME" -p "$CLUSTER_ADMIN_PASSWORD" --insecure-skip-tls-verify >/dev/null
-
+    if [[ $? != 0 ]]; then
+      echo "Cluster $ARO_CLUSTER_NAME Login Failed exiting ..."
+      exit 0
+    fi
     echo "Creating Project $PLATFORM_NAMESPACE in $ARO_CLUSTER_NAME cluster"
 
     oc project "$PLATFORM_NAMESPACE" || oc new-project "$PLATFORM_NAMESPACE"
+
+    echo "Applying AUTOSCALER Config for $ARO_CLUSTER_NAME"
+    [ -d  platform-config/autoscaler ] || mkdir platform-config/autoscaler
+    WORKER_MACHINESET_NAMES=$(oc get MachineSet  --no-headers  -n openshift-machine-api | awk '{print $1}')
+    envsubst < platform-config/cluster-autoscaler.tpl > platform-config/autoscaler/cluster-autoscaler.yaml
+    for WORKER_NAMES in $WORKER_MACHINESET_NAMES; do
+      export WORKER_NAMES=$WORKER_NAMES
+      envsubst < platform-config/machineautoscaler.tpl > platform-config/autoscaler/"$WORKER_NAMES".yaml
+    done
+    oc apply -f platform-config/autoscaler/
 
     echo "Creating kubernetes TLS Secret for $BASE_DOMAIN"
 
