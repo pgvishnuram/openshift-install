@@ -61,10 +61,11 @@ export PLATFORM_VERSION="${PLATFORM_VERSION:-0.29.2}"
 export PLATFORM_NAMESPACE="${PLATFORM_NAMESPACE:-astronomer}"
 export PLATFORM_RELEASE_NAME="${PLATFORM_RELEASE_NAME:-astronomer}"
 export HOSTED_ZONE_NAME="${HOSTED_ZONE_NAME:-astro-qa.link.}"
+export HELM_TIMEOUT="${HELM_TIMEOUT:-600s}"
 
 function check_resource_group_existence() {
     if [ "$(az group exists --name "$RESOURCE_GROUP_NAME")" == true ]; then
-           echo "resource group $RESOURCE_GROUP_NAME alredy exists. reusing pre-created one"
+           echo "resource group $RESOURCE_GROUP_NAME already exists. reusing pre-created one"
         else
            echo 'creating new resource group'
            az group create --name "$RESOURCE_GROUP_NAME" --location "$LOCATION"
@@ -85,7 +86,7 @@ function install_aro() {
     az provider register -n Microsoft.Storage --wait
 
     if [ "$(az group exists --name "$RESOURCE_GROUP_NAME")" == true ]; then
-           echo "resource group $RESOURCE_GROUP_NAME alredy exists. reusing pre-created one"
+           echo "resource group $RESOURCE_GROUP_NAME already exists. reusing pre-created one"
         else
            echo 'creating new resource group'
            az group create --name "$RESOURCE_GROUP_NAME" --location "$LOCATION"
@@ -145,7 +146,7 @@ function deploy_postgres() {
     if [[ $(az network vnet list --resource-group "$RESOURCE_GROUP_NAME" --query "[?name=='$VNET_NAME'] | length(@)")  -gt 0 ]]; then
       echo "vnet $VNET_NAME already exists. reusing pre-created one"
       else
-      echo "create $VNET_NAME vnet "
+      echo "creating $VNET_NAME vnet"
       az network vnet create --resource-group "$RESOURCE_GROUP_NAME" --name "$VNET_NAME"  --address-prefixes $VNET_CIDR
       echo "vnet $VNET_NAME creation completed"
     fi
@@ -153,7 +154,7 @@ function deploy_postgres() {
     if [[ $(az network vnet subnet list --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME"  --query "[?name=='$DB_SUBNET_NAME'] | length(@)")  -gt 0 ]]; then
       echo "subnet $DB_SUBNET_NAME already exists. reusing pre-created one"
       else
-      echo "creating db subnet "
+      echo "creating Database subnet $DB_SUBNET_NAME"
       az network vnet subnet create --resource-group "$RESOURCE_GROUP_NAME" --vnet-name "$VNET_NAME" --name "$DB_SUBNET_NAME" --address-prefixes "$DB_SUBNET"
       echo "subnet $DB_SUBNET_NAME creation completed"
     fi
@@ -208,7 +209,7 @@ function install_platform(){
        yes | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --agree-tos
     else
       echo "Certificate Path for $BASE_DOMAIN  already exists"
-      echo "Validating SSL for $BASE_DOMAIN "
+      echo "Validating SSL CERTIFICATE for $BASE_DOMAIN "
       if openssl x509 -checkend 86400 -noout -in live/"$BASE_DOMAIN"/fullchain.pem ;
         then
             echo "$BASE_DOMAIN Certificate is still valid"
@@ -227,11 +228,11 @@ function install_platform(){
 
     yes | oc login "$CLUSTER_API_URL" -u "$CLUSTER_ADMIN_USERNAME" -p "$CLUSTER_ADMIN_PASSWORD" --insecure-skip-tls-verify >/dev/null
     if [[ $? != 0 ]]; then
-      echo "Cluster $ARO_CLUSTER_NAME Login Failed exiting ..."
+      echo "Login failed for Cluster $ARO_CLUSTER_NAME  exiting ..."
       exit 0
     fi
-    echo "Creating Project $PLATFORM_NAMESPACE in $ARO_CLUSTER_NAME cluster"
 
+    echo "Creating Project $PLATFORM_NAMESPACE in $ARO_CLUSTER_NAME cluster"
     oc project "$PLATFORM_NAMESPACE" || oc new-project "$PLATFORM_NAMESPACE"
 
     echo "Applying AUTOSCALER Config for $ARO_CLUSTER_NAME"
@@ -244,20 +245,20 @@ function install_platform(){
     done
     oc apply -f platform-config/autoscaler/
 
-    echo "Creating kubernetes TLS Secret for $BASE_DOMAIN"
+    echo "Creating kubernetes TLS Secret for $BASE_DOMAIN in $PLATFORM_NAMESPACE namespace."
 
     kubectl -n "$PLATFORM_NAMESPACE" get secret astronomer-tls ||  kubectl  -n "$PLATFORM_NAMESPACE" create secret tls astronomer-tls --cert live/"$BASE_DOMAIN"/fullchain.pem --key live/"$BASE_DOMAIN"/privkey.pem
 
-    echo "Creating Bootstrap Secret  for Platform Installation"
+    echo "Creating Bootstrap Secret  for Platform Installation in $PLATFORM_NAMESPACE namespace."
     kubectl -n "$PLATFORM_NAMESPACE" get secret astronomer-bootstrap || kubectl -n "$PLATFORM_NAMESPACE" create secret generic astronomer-bootstrap --from-literal connection="postgres://astro:astro@$AZURE_FLEXI_POSTGRES:5432"
 
     helm repo add astronomer-internal https://internal-helm.astronomer.io/
     helm repo update >/dev/null
 
-    echo "Installing  astronomer enterprise with version $PLATFORM_VERSION"
+    echo "Installing  Astronomer Software with version $PLATFORM_VERSION"
 
     envsubst < platform-config/config.tpl > platform-config/config.yaml
-    helm -n "$PLATFORM_NAMESPACE"  upgrade --install "$PLATFORM_RELEASE_NAME" astronomer-internal/astronomer --version "$PLATFORM_VERSION"  -f platform-config/config.yaml --debug
+    helm -n "$PLATFORM_NAMESPACE"  upgrade --install "$PLATFORM_RELEASE_NAME" astronomer-internal/astronomer --version "$PLATFORM_VERSION"  -f platform-config/config.yaml --timeout $HELM_TIMEOUT --debug
 
 
     oc adm policy add-scc-to-user privileged system:serviceaccount:"$PLATFORM_NAMESPACE":"$PLATFORM_RELEASE_NAME-elasticsearch"
