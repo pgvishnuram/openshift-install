@@ -42,9 +42,13 @@ export MASTER_SUBNET_NAME=$ARO_CLUSTER_NAME-master
 
 export WORKER_SUBNET_NAME=$ARO_CLUSTER_NAME-worker
 
+export MASTER_VM_SIZE="${ARO_MASTER_VM_SIZE:-Standard_D8s_v3}"
+
+export WORKER_VM_SIZE="${ARO_WORKER_VM_SIZE:-Standard_D8s_v3}"
+
 export DB_SUBNET_NAME=$ARO_CLUSTER_NAME-db
 
-WORKER_NODE_SIZE="${WORKER_NODE_SIZE:-6}"
+export WORKER_NODE_SIZE="${WORKER_NODE_SIZE:-6}"
 
 export WORKER_AUTOSCALE_COUNT="${WORKER_AUTOSCALE_COUNT:-12}"
 
@@ -135,7 +139,7 @@ function install_aro() {
         echo "cluster $ARO_CLUSTER_NAME already exists"
        else
         echo "creating $ARO_CLUSTER_NAME aro cluster"
-        az aro create --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" --vnet "$VNET_NAME" --master-subnet "$MASTER_SUBNET_NAME"  --worker-subnet "$WORKER_SUBNET_NAME" --worker-count "$WORKER_NODE_SIZE" --debug
+        az aro create --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" --vnet "$VNET_NAME" --master-subnet "$MASTER_SUBNET_NAME"  --worker-subnet "$WORKER_SUBNET_NAME" --master-vm-size "$MASTER_VM_SIZE" --worker-vm-size  "$WORKER_VM_SIZE" --worker-count "$WORKER_NODE_SIZE" --debug
 
     fi
 }
