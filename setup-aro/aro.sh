@@ -55,6 +55,10 @@ export WORKER_AUTOSCALE_COUNT="${WORKER_AUTOSCALE_COUNT:-12}"
 
 export POSTGRES_SERVER_NAME=$ARO_CLUSTER_NAME-dbserver
 
+export KEDA_CHART_VERSION="${KEDA_CHART_VERSION:-2.2}"
+
+export KEDA_NAMESPACE="${KEDA_NAMESPACE:-keda}"
+
 DB_USERNAME="${DB_USERNAME:-astro}"
 
 DB_PASSWORD="${DB_PASSWORD:-astro}"
@@ -357,10 +361,18 @@ EOF
 	   --verb=create,get \
 	   --resource=secrets
     oc apply -f "${ARO_CLUSTER_NAME}"afs-file.yaml
-    kubectl get ns monitoring || kubectl create namespace monitoring
+    oc project monitoring || oc new-project monitoring
     kubectl label namespace monitoring kubernetes.io/metadata.name=monitoring --overwrite=true
-    kubectl get ns istio || kubectl create namespace istio
+    oc project istio || oc new-project namespace istio
     kubectl label namespace istio app=istio --overwrite=true
+
+    echo "Deploying KEDA with version ${KEDA_CHART_VERSION} ..."
+    echo "running helm repo add kedacore https://kedacore.github.io/charts"
+    helm repo add kedacore https://kedacore.github.io/charts
+    echo "running helm repo update"
+    helm repo update  >/dev/null
+    oc project keda || oc new-project keda
+    helm upgrade --install keda kedacore/keda --version ${KEDA_CHART_VERSION}  --namespace ${KEDA_NAMESPACE} --debug
 
 }
 
