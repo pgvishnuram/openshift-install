@@ -14,6 +14,7 @@ function usage() {
     echo "   deploy_postgres          Deploy azureflexible postgres cluster        "
     echo "   install_aro              Install AzureRedhat Openshift Cluster        "
     echo "   install_platform         Install Astronomer Platform                  "
+    echo "   install_addons           Install Addons                               "
     echo "   obtain_aro_info          Obtain information about the ARO4 Cluster    "
     echo "   delete_postgres          Delete azureflexible postgres cluster        "
     echo "   delete_aro               Delete ARO cluster                           "
@@ -287,6 +288,82 @@ function install_platform(){
 
 }
 
+
+function authenticate_aro() {
+
+    echo "Authenticating with ARO CLUSTER $ARO_CLUSTER_NAME"
+
+    CLUSTER_API_URL=$(az aro show --name "$ARO_CLUSTER_NAME" --resource-group "$RESOURCE_GROUP_NAME" --query "apiserverProfile.url" -o tsv)
+    CLUSTER_ADMIN_USERNAME=$(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME"| jq -r '.kubeadminUsername')
+    CLUSTER_ADMIN_PASSWORD=$(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" | jq -r '.kubeadminPassword')
+    AZURE_FLEXI_POSTGRES=$(az postgres flexible-server list --query "[?name=='$POSTGRES_SERVER_NAME']" | jq -r '.[].fullyQualifiedDomainName')
+
+    yes | oc login "$CLUSTER_API_URL" -u "$CLUSTER_ADMIN_USERNAME" -p "$CLUSTER_ADMIN_PASSWORD" --insecure-skip-tls-verify >/dev/null
+    if [[ $? != 0 ]]; then
+      echo "Login failed for Cluster $ARO_CLUSTER_NAME  exiting ..."
+      exit 0
+    fi
+
+}
+
+function install_addons(){
+    export AZURE_STORAGE_ACCOUNT_NAME="${ARO_CLUSTER_NAME}azurefs"
+    if [[ $(az storage account list --resource-group "$RESOURCE_GROUP_NAME" --query "[?name=='$AZURE_STORAGE_ACCOUNT_NAME'] | length(@)")  -gt 0 ]]; then
+      echo "vnet $AZURE_STORAGE_ACCOUNT_NAME already exists. reusing pre-created one"
+      else
+      echo "creating $AZURE_STORAGE_ACCOUNT_NAME fileshare"
+      az storage account create \
+	    --name $AZURE_STORAGE_ACCOUNT_NAME \
+	    --resource-group $RESOURCE_GROUP_NAME \
+	    --kind StorageV2 \
+	    --sku Standard_LRS
+      echo "Azure storage account with name $AZURE_STORAGE_ACCOUNT_NAME creation completed"
+    fi
+    export ARO_SERVICE_PRINCIPAL_ID=$(az aro show -g $RESOURCE_GROUP_NAME -n $ARO_CLUSTER_NAME --query servicePrincipalProfile.clientId -o tsv)
+    export GET_SUBSCRIPTION_ID=$(az group show  -g $RESOURCE_GROUP_NAME  | jq -r '.id' | awk -F'/' '{print $3}')
+    az role assignment create --role Contributor --scope /subscriptions/${GET_SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP_NAME} \
+       --assignee $ARO_SERVICE_PRINCIPAL_ID 
+    
+    
+    cat << EOF >> ${ARO_CLUSTER_NAME}afs-file.yaml
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: azure-file
+  namespace: kube-system
+provisioner: kubernetes.io/azure-file
+mountOptions:
+  - dir_mode=0777
+  - file_mode=0777
+  - uid=0
+  - gid=0
+  - mfsymlinks
+  - cache=strict
+  - actimeo=30
+  - noperm
+parameters:
+  location: $LOCATION
+  secretNamespace: kube-system
+  skuName: Standard_LRS
+  storageAccount: ${AZURE_STORAGE_ACCOUNT_NAME}
+  resourceGroup: ${RESOURCE_GROUP_NAME}
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+EOF
+    
+    
+    authenticate_aro
+    oc get clusterrole azure-secret-reader || oc create clusterrole azure-secret-reader \
+	   --verb=create,get \
+	   --resource=secrets
+    oc apply -f ${ARO_CLUSTER_NAME}afs-file.yaml
+    kubectl get ns monitoring || kubectl create namespace monitoring
+    kubectl label namespace monitoring kubernetes.io/metadata.name=monitoring --overwrite=true
+    kubectl get ns istio || kubectl create namespace istio
+    kubectl label namespace istio app=istio --overwrite=true
+
+}
+
 ## MAIN
 case "$1" in
     install_aro)
@@ -329,6 +406,12 @@ case "$1" in
     install_platform)
         echo "Setup Astronomer Platform"
         install_platform
+        echo
+        ;;
+
+    install_addons)
+        echo "Deploying  Addons to ARO Cluster "
+        install_addons
         echo
         ;;
 
