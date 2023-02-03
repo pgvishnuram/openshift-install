@@ -309,23 +309,23 @@ function authenticate_aro() {
 function install_addons(){
     export AZURE_STORAGE_ACCOUNT_NAME="${ARO_CLUSTER_NAME}azurefs"
     if [[ $(az storage account list --resource-group "$RESOURCE_GROUP_NAME" --query "[?name=='$AZURE_STORAGE_ACCOUNT_NAME'] | length(@)")  -gt 0 ]]; then
-      echo "vnet $AZURE_STORAGE_ACCOUNT_NAME already exists. reusing pre-created one"
+      echo "Azure Storage Account $AZURE_STORAGE_ACCOUNT_NAME already exists. reusing pre-created one"
       else
       echo "creating $AZURE_STORAGE_ACCOUNT_NAME fileshare"
       az storage account create \
-	    --name $AZURE_STORAGE_ACCOUNT_NAME \
-	    --resource-group $RESOURCE_GROUP_NAME \
+	    --name "$AZURE_STORAGE_ACCOUNT_NAME" \
+	    --resource-group "$RESOURCE_GROUP_NAME" \
 	    --kind StorageV2 \
 	    --sku Standard_LRS
       echo "Azure storage account with name $AZURE_STORAGE_ACCOUNT_NAME creation completed"
     fi
-    export ARO_SERVICE_PRINCIPAL_ID=$(az aro show -g $RESOURCE_GROUP_NAME -n $ARO_CLUSTER_NAME --query servicePrincipalProfile.clientId -o tsv)
-    export GET_SUBSCRIPTION_ID=$(az group show  -g $RESOURCE_GROUP_NAME  | jq -r '.id' | awk -F'/' '{print $3}')
-    az role assignment create --role Contributor --scope /subscriptions/${GET_SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP_NAME} \
-       --assignee $ARO_SERVICE_PRINCIPAL_ID 
-    
-    
-    cat << EOF >> ${ARO_CLUSTER_NAME}afs-file.yaml
+    export ARO_SERVICE_PRINCIPAL_ID=$(az aro show -g "$RESOURCE_GROUP_NAME" -n "$ARO_CLUSTER_NAME" --query servicePrincipalProfile.clientId -o tsv)
+    export GET_SUBSCRIPTION_ID=$(az group show  -g "$RESOURCE_GROUP_NAME"  | jq -r '.id' | awk -F'/' '{print $3}')
+    az role assignment create --role Contributor --scope /subscriptions/"${GET_SUBSCRIPTION_ID}"/resourceGroups/"${RESOURCE_GROUP_NAME}" \
+       --assignee "$ARO_SERVICE_PRINCIPAL_ID"
+
+
+    cat << EOF >> "${ARO_CLUSTER_NAME}afs-file.yaml"
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
@@ -350,13 +350,13 @@ parameters:
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 EOF
-    
-    
+
+
     authenticate_aro
     oc get clusterrole azure-secret-reader || oc create clusterrole azure-secret-reader \
 	   --verb=create,get \
 	   --resource=secrets
-    oc apply -f ${ARO_CLUSTER_NAME}afs-file.yaml
+    oc apply -f "${ARO_CLUSTER_NAME}"afs-file.yaml
     kubectl get ns monitoring || kubectl create namespace monitoring
     kubectl label namespace monitoring kubernetes.io/metadata.name=monitoring --overwrite=true
     kubectl get ns istio || kubectl create namespace istio
