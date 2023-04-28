@@ -183,9 +183,18 @@ function deploy_postgres() {
 function obtain_aro_info() {
     echo "CLUSTER_CONSOLE_URL: $(az aro show --name "$ARO_CLUSTER_NAME" --resource-group "$RESOURCE_GROUP_NAME" --query "consoleProfile.url" -o tsv)"
 
-    echo "CLUSTER_ADMIN_USERNAME: $(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME"| jq -r '.kubeadminUsername')"
+    CLUSTER_ADMIN_USERNAME=$(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME"| jq -r '.kubeadminUsername')
+    CLUSTER_ADMIN_PASSWORD=$(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" | jq -r '.kubeadminPassword')
 
-    echo "CLUSTER_ADMIN_PASSWORD: $(az aro list-credentials --resource-group "$RESOURCE_GROUP_NAME" --name "$ARO_CLUSTER_NAME" | jq -r '.kubeadminPassword')"
+    echo "CLUSTER_ADMIN_USERNAME: $CLUSTER_ADMIN_USERNAME"
+
+    echo "CLUSTER_ADMIN_PASSWORD: $CLUSTER_ADMIN_PASSWORD"
+
+    CLUSTER_API_URL=$(az aro show --name "$ARO_CLUSTER_NAME" --resource-group "$RESOURCE_GROUP_NAME" --query "apiserverProfile.url" -o tsv)
+
+    echo "Connect ARO cluster with below command"
+
+    echo "oc login "$CLUSTER_API_URL" -u "$CLUSTER_ADMIN_USERNAME" -p "$CLUSTER_ADMIN_PASSWORD""
 }
 
 
@@ -269,6 +278,10 @@ function install_platform(){
     envsubst < platform-config/config.tpl > platform-config/config.yaml
     helm -n "$PLATFORM_NAMESPACE"  upgrade --install "$PLATFORM_RELEASE_NAME" astronomer-internal/astronomer --version "$PLATFORM_VERSION"  -f platform-config/config.yaml --timeout $HELM_TIMEOUT --debug
 
+    if [[ $? != 0 ]]; then
+      echo "Platform Installation failed for Cluster $ARO_CLUSTER_NAME  with version $PLATFORM_VERSION exiting ..."
+      exit 0
+    fi
 
     oc adm policy add-scc-to-user privileged system:serviceaccount:"$PLATFORM_NAMESPACE":"$PLATFORM_RELEASE_NAME-elasticsearch"
 
@@ -372,7 +385,7 @@ EOF
     echo "running helm repo update"
     helm repo update  >/dev/null
     oc project keda || oc new-project keda
-    helm upgrade --install keda kedacore/keda --version ${KEDA_CHART_VERSION}  --namespace ${KEDA_NAMESPACE} --debug
+    helm upgrade --install keda kedacore/keda --version "${KEDA_CHART_VERSION}"  --namespace "${KEDA_NAMESPACE}" --debug
 
 }
 
