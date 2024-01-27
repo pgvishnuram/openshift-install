@@ -224,7 +224,7 @@ function delete_postgres(){
 function install_platform(){
     if [[ ! -d live/$BASE_DOMAIN ]]; then
        echo "Generating SSL CERTIFICATE for $BASE_DOMAIN"
-       yes | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --agree-tos
+       yes | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --key-type rsa --agree-tos
     else
       echo "Certificate Path for $BASE_DOMAIN  already exists"
       echo "Validating SSL CERTIFICATE for $BASE_DOMAIN "
@@ -232,7 +232,7 @@ function install_platform(){
         then
             echo "$BASE_DOMAIN Certificate is still valid"
         else
-            yes | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --agree-tos
+            yes | certbot certonly  --dns-route53 --dns-route53-propagation-seconds 30 -d "$BASE_DOMAIN" -d "*.$BASE_DOMAIN" --work-dir . --logs-dir . --config-dir .  -m infrastructure@astronomer.io --key-type rsa --agree-tos
         fi
     fi
 
