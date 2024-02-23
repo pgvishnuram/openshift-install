@@ -66,7 +66,7 @@ DB_PASSWORD="${DB_PASSWORD:-astro}"
 # Defaults for Astronomer Platform ENV Vars
 
 export BASE_DOMAIN="${BASE_DOMAIN:-vishnu-aks-028.astro-qa.link}"
-export PLATFORM_VERSION="${PLATFORM_VERSION:-0.29.2}"
+export PLATFORM_VERSION="${PLATFORM_VERSION:-0.34.0}"
 export PLATFORM_NAMESPACE="${PLATFORM_NAMESPACE:-astronomer}"
 export PLATFORM_RELEASE_NAME="${PLATFORM_RELEASE_NAME:-astronomer}"
 export HOSTED_ZONE_NAME="${HOSTED_ZONE_NAME:-astro-qa.link.}"
